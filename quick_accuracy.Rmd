@@ -81,17 +81,17 @@ df %>%
   filter(top_p !=1, temp <.5) %>%
   mutate(
     pred_match = label == dq_pred,
-    suff_match = suff_pred == sufficient,
   ) %>%
-  group_by(passage, suff_match) %>%
+  group_by(passage, sufficient) %>%
   summarise(
     num=n(),
     pred_acc=sum(pred_match, na.rm=T)/num,
   ) %>%
-  group_by(suff_match) %>%
+  group_by(sufficient) %>%
   summarize(
     pred_acc = weighted.mean(pred_acc, num),
-    num = sum(num)
+    num = sum(num),
+    passage_num = n()
   ) %>%
   map_df(round, 2)
 ```
@@ -102,39 +102,84 @@ df %>%
   filter(top_p !=1, temp <.5) %>%
   mutate(
     pred_match = label == dq_pred,
-    nec_match = necc_pred == necessary,
   ) %>%
-  group_by(passage, nec_match) %>%
+  group_by(passage, necessary) %>%
   summarise(
     num=n(),
     pred_acc=sum(pred_match, na.rm=T)/num,
   ) %>%
-  group_by(nec_match) %>%
+  group_by(necessary) %>%
   summarize(
     pred_acc = weighted.mean(pred_acc, num),
-    num = sum(num)
+    num = sum(num),
+    passage_num = n()
   ) %>%
   map_df(round, 2)
 ```
 
-The following shows no significant difference for norm violation.
+The following would indicate that the model is better at predicting human labels when there is norm violation.
+```{r}
+df %>%
+  filter(top_p !=1, temp <.5) %>%
+  mutate(
+    pred_match = label == dq_pred,
+  ) %>%
+  group_by(passage, `norm violation`) %>%
+  summarise(
+    num=n(),
+    pred_acc=sum(pred_match, na.rm=T)/num,
+  ) %>%
+  group_by(`norm violation`) %>%
+  summarize(
+    pred_acc = weighted.mean(pred_acc, num),
+    num = sum(num),
+    passage_num = n()
+  ) %>%
+  map_df(round, 2)
+```
+
+There is also a seemingly significant effect when other causes are norm violating.
 
 ```{r}
 df %>%
   filter(top_p !=1, temp <.5) %>%
   mutate(
     pred_match = label == dq_pred,
-    norm_match = norm_pred == normal,
   ) %>%
-  group_by(passage, norm_match) %>%
+  group_by(passage, `other norm violation`) %>%
   summarise(
     num=n(),
     pred_acc=sum(pred_match, na.rm=T)/num,
   ) %>%
-  group_by(norm_match) %>%
+  group_by(`other norm violation`) %>%
   summarize(
     pred_acc = weighted.mean(pred_acc, num),
-    num = sum(num)
+    num = sum(num),
+    passage_num = n()
   ) %>%
   map_df(round, 2)
+
+```
+
+All four.
+
+```{r}
+df %>%
+  filter(top_p !=1, temp <.5) %>%
+  mutate(
+    pred_match = label == dq_pred,
+  ) %>%
+  group_by(passage, necessary, sufficient, `norm violation`, `other norm violation`) %>%
+  summarise(
+    num=n(),
+    pred_acc=sum(pred_match, na.rm=T)/num,
+  ) %>%
+  group_by(necessary, sufficient, `norm violation`, `other norm violation`) %>%
+  summarize(
+    pred_acc = weighted.mean(pred_acc, num),
+    num = sum(num),
+    passage_num = n()
+  ) %>%
+  map_df(round, 2)
+
 ```
