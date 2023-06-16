@@ -1,0 +1,140 @@
+---
+title: "quick_accuracy_analysis"
+author: "Robert Ness"
+date: "2023-06-15"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an analysis to get some accuracy numbers.  Going to focus on low temperature numbers and top p that is not 1.  Using the data in the "quick_accuracy" folder.
+
+```{r cars}
+# Load the necessary packages
+library(tidyverse)
+library(purrr)
+
+# Set the directory where the CSV files are stored
+directory <- "vignettes/quick_accuracy"
+
+# Get a list of all the CSV files in the directory
+file_list <- list.files(path = directory, pattern = "*.csv", full.names = TRUE)
+
+# Use map_df to read each CSV file and row bind them into a single dataframe
+df_raw <- file_list %>% 
+  map_df(read_csv)
+
+labels <- read_csv("vignettes/annotated_causal_judgment_philip - June 15 2022.csv") %>%
+  rename(passage = input) %>%
+  filter(intention == 0)
+
+df <- df_raw %>%
+  left_join(labels, by = "passage")
+```
+
+```{r munge}
+df %>%
+  filter(top_p !=1, temp <.5) %>%
+  mutate(
+    pred_match = label == dq_pred,
+    suff_match = suff_pred == sufficient,
+    nec_match = necc_pred == necessary,
+    norm_match = norm_pred == normal,
+    other_norm_match = other_norm_pred == `other norm violation`,
+    undesirable_match = adverse_pred == `undesirable outcome`,
+    omission_match = absent_pred == omission
+  ) %>%
+  group_by(passage) %>%
+  summarise(
+    num=n(),
+    pred_acc=sum(pred_match, na.rm=T)/num,
+    nec_acc=sum(nec_match, na.rm=T)/num,
+    suff_acc=sum(suff_match, na.rm=T)/num,
+    nec_acc=sum(nec_match, na.rm=T)/num,
+    norm_acc=sum(norm_match, na.rm=T)/num,
+    other_norm_acc=sum(other_norm_match, na.rm=T)/num,
+    undesirable_acc=sum(undesirable_match, na.rm=T)/num,
+    omission_acc=sum(omission_match, na.rm=T)/num
+  ) %>%
+  ungroup %>%
+  summarize(
+    pred_acc = weighted.mean(pred_acc, num),
+    nec_acc = weighted.mean(nec_acc, num),
+    suff_acc=weighted.mean(suff_acc, num),
+    norm_acc=weighted.mean(norm_acc, num),
+    other_norm_acc = weighted.mean(other_norm_acc, num),
+    undesirable_acc=weighted.mean(undesirable_acc, num),
+    omission_acc=weighted.mean(omission_acc, num)
+  ) %>%
+  map_df(round, 2)
+```
+Next see if there is any difference in accuracy between individual groups.
+
+The following shows no significant difference for sufficiency.
+
+```{r}
+df %>%
+  filter(top_p !=1, temp <.5) %>%
+  mutate(
+    pred_match = label == dq_pred,
+    suff_match = suff_pred == sufficient,
+  ) %>%
+  group_by(passage, suff_match) %>%
+  summarise(
+    num=n(),
+    pred_acc=sum(pred_match, na.rm=T)/num,
+  ) %>%
+  group_by(suff_match) %>%
+  summarize(
+    pred_acc = weighted.mean(pred_acc, num),
+    num = sum(num)
+  ) %>%
+  map_df(round, 2)
+```
+The following shows no significant difference for necessity.
+
+```{r}
+df %>%
+  filter(top_p !=1, temp <.5) %>%
+  mutate(
+    pred_match = label == dq_pred,
+    nec_match = necc_pred == necessary,
+  ) %>%
+  group_by(passage, nec_match) %>%
+  summarise(
+    num=n(),
+    pred_acc=sum(pred_match, na.rm=T)/num,
+  ) %>%
+  group_by(nec_match) %>%
+  summarize(
+    pred_acc = weighted.mean(pred_acc, num),
+    num = sum(num)
+  ) %>%
+  map_df(round, 2)
+```
+
+The following shows no significant difference for norm violation.
+
+```{r}
+df %>%
+  filter(top_p !=1, temp <.5) %>%
+  mutate(
+    pred_match = label == dq_pred,
+    norm_match = norm_pred == normal,
+  ) %>%
+  group_by(passage, norm_match) %>%
+  summarise(
+    num=n(),
+    pred_acc=sum(pred_match, na.rm=T)/num,
+  ) %>%
+  group_by(norm_match) %>%
+  summarize(
+    pred_acc = weighted.mean(pred_acc, num),
+    num = sum(num)
+  ) %>%
+  map_df(round, 2)
+```
